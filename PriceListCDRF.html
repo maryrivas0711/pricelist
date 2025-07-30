@@ -1,0 +1,822 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Lista de Precios</title>
+
+    <!-- =================== INICIO DE MODIFICACIONES =================== -->
+
+    <!-- Enlace al manifiesto de la aplicación -->
+    <link rel="manifest" href="manifest.json">
+
+    <!-- Metaetiquetas para iOS (iPhone/iPad) -->
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+    <meta name="apple-mobile-web-app-title" content="Precios">
+    <link rel="apple-touch-icon" href="icon-192x192.png">
+
+    <!-- Script para registrar el Service Worker (habilita el modo offline) -->
+    <script>
+        if ('serviceWorker' in navigator) {
+            window.addEventListener('load', () => {
+                navigator.serviceWorker.register('./service-worker.js')
+                    .then(registration => console.log('Service Worker: Registrado con éxito'))
+                    .catch(err => console.log('Service Worker: Falló el registro', err));
+            });
+        }
+    </script>
+
+    <!-- ==================== FIN DE MODIFICACIONES ===================== -->
+
+    <style>
+        :root {
+            --primary-color: #4a6bff;
+            --secondary-color: #f8f9fa;
+            --accent-color: #ff6b6b;
+            --text-color: #333;
+            --light-text: #666;
+            --border-color: #ddd;
+            --success-color: #28a745;
+            --warning-color: #ffc107;
+            --edit-color: #17a2b8;
+            --delete-color: #dc3545;
+        }
+        
+        * {
+            box-sizing: border-box;
+            margin: 0;
+            padding: 0;
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+        }
+        
+        body {
+            background-color: #f5f5f5;
+            color: var(--text-color);
+            line-height: 1.6;
+            padding: 10px;
+            max-width: 100%;
+            font-size: 14px;
+        }
+        
+        .container {
+            max-width: 800px;
+            margin: 0 auto;
+            background: white;
+            border-radius: 8px;
+            box-shadow: 0 2px 10px rgba(0, 0, 0, 0.1);
+            overflow: hidden;
+        }
+        
+        header {
+            background-color: var(--primary-color);
+            color: white;
+            padding: 12px 15px;
+            text-align: center;
+        }
+        
+        h1 {
+            font-size: 1.3rem;
+            margin-bottom: 3px;
+        }
+        
+        .tabs {
+            display: flex;
+            background-color: #e9ecef;
+        }
+        
+        .tab {
+            padding: 10px 15px;
+            cursor: pointer;
+            flex: 1;
+            text-align: center;
+            font-weight: 600;
+            font-size: 0.9rem;
+            transition: all 0.3s ease;
+        }
+        
+        .tab.active {
+            background-color: white;
+            color: var(--primary-color);
+            border-bottom: 3px solid var(--primary-color);
+        }
+        
+        .tab-content {
+            display: none;
+            padding: 15px;
+        }
+        
+        .tab-content.active {
+            display: block;
+        }
+        
+        .form-group {
+            margin-bottom: 12px;
+        }
+        
+        label {
+            display: block;
+            margin-bottom: 4px;
+            font-weight: 500;
+            color: var(--light-text);
+            font-size: 0.9rem;
+        }
+        
+        input, select {
+            width: 100%;
+            padding: 8px 12px;
+            border: 1px solid var(--border-color);
+            border-radius: 4px;
+            font-size: 0.9rem;
+        }
+        
+        input:focus, select:focus {
+            outline: none;
+            border-color: var(--primary-color);
+            box-shadow: 0 0 0 2px rgba(74, 107, 255, 0.2);
+        }
+        
+        button {
+            background-color: var(--primary-color);
+            color: white;
+            border: none;
+            padding: 10px 15px;
+            border-radius: 4px;
+            cursor: pointer;
+            font-size: 0.9rem;
+            font-weight: 600;
+            width: 100%;
+            transition: background-color 0.3s;
+        }
+        
+        button:hover {
+            background-color: #3a5bef;
+        }
+        
+        .btn-success {
+            background-color: var(--success-color);
+        }
+        
+        .btn-success:hover {
+            background-color: #218838;
+        }
+        
+        .btn-warning {
+            background-color: var(--warning-color);
+            color: #212529;
+        }
+        
+        .btn-warning:hover {
+            background-color: #e0a800;
+        }
+        
+        .btn-edit {
+            background-color: var(--edit-color);
+            padding: 4px 8px; 
+            font-size: 0.75rem; 
+            width: auto; 
+            color: white; 
+        }
+        
+        .btn-delete {
+            background-color: var(--delete-color);
+            padding: 4px 8px; 
+            font-size: 0.75rem; 
+            width: auto; 
+            color: white; 
+        }
+        
+        .btn-edit:hover {
+            background-color: #138496;
+        }
+        
+        .btn-delete:hover {
+            background-color: #c82333;
+        }
+        
+        .rates-config {
+            background-color: var(--secondary-color);
+            padding: 12px;
+            border-radius: 5px;
+            margin-bottom: 15px;
+        }
+        
+        .rates-config h3 {
+            margin-bottom: 8px;
+            color: var(--primary-color);
+            font-size: 1rem;
+        }
+        
+        .rates-row {
+            display: flex;
+            gap: 10px;
+            margin-bottom: 10px;
+        }
+        
+        .rate-input {
+            flex: 1;
+        }
+        
+        /* Estilos para el nuevo layout de producto */
+        .product-item {
+            background-color: white;
+            border: 1px solid var(--border-color);
+            border-radius: 5px;
+            margin-bottom: 8px;
+            display: grid;
+            grid-template-rows: auto auto auto; /* ID/botones, Nombre, %/precios */
+            grid-template-areas:
+                "top-row"
+                "mid-row"
+                "bottom-row";
+            overflow: hidden; 
+        }
+
+        .product-top-row {
+            grid-area: top-row;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 8px 10px;
+            background-color: #e9ecef; 
+            border-bottom: 1px solid var(--border-color);
+        }
+
+        .product-id {
+            font-weight: bold;
+            color: var(--primary-color); 
+            font-size: 0.9rem;
+            padding-right: 10px; 
+        }
+
+        .product-actions {
+            display: flex;
+            gap: 5px;
+        }
+
+        .product-name {
+            grid-area: mid-row;
+            font-weight: 600;
+            padding: 8px 10px;
+            text-align: center; 
+            font-size: 1rem;
+            border-bottom: 1px solid var(--border-color);
+            background-color: white;
+            color: var(--text-color); /* Asegurar color de texto negro */
+        }
+
+        .product-bottom-row {
+            grid-area: bottom-row;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 8px 10px;
+            background-color: #f8f8f8; 
+            color: var(--text-color); /* Asegurar color de texto negro */
+        }
+        
+        .profit-percentage {
+            color: var(--accent-color); 
+            font-size: 0.85rem;
+            font-weight: 500;
+        }
+
+        .product-prices {
+            display: flex;
+            gap: 15px; 
+        }
+
+        .price-item {
+            display: flex;
+            align-items: center;
+            gap: 4px;
+        }
+        
+        .price-value {
+            font-weight: 700;
+            font-size: 0.9rem;
+            color: var(--text-color); /* Asegurar color de texto negro */
+        }
+        
+        .price-usd {
+            color: var(--success-color); 
+        }
+        
+        .price-bs {
+            color: var(--primary-color); 
+        }
+
+        .empty-state {
+            text-align: center;
+            padding: 20px;
+            color: var(--light-text);
+            font-size: 0.9rem;
+        }
+        
+        .edit-form {
+            margin-top: 10px;
+            padding-top: 10px;
+            border-top: 1px dashed var(--border-color);
+            background-color: #f0f0f0;
+            padding: 10px;
+            border-radius: 5px;
+        }
+        
+        .edit-buttons {
+            display: flex;
+            gap: 8px;
+            margin-top: 8px;
+        }
+        
+        .edit-buttons button {
+            flex: 1;
+            padding: 8px;
+            font-size: 0.8rem;
+        }
+        
+        .modal {
+            display: none;
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background-color: rgba(0, 0, 0, 0.5);
+            z-index: 1000;
+            justify-content: center;
+            align-items: center;
+        }
+        
+        .modal-content {
+            background-color: white;
+            padding: 20px;
+            border-radius: 8px;
+            width: 90%;
+            max-width: 400px;
+        }
+        
+        .modal-buttons {
+            display: flex;
+            gap: 10px;
+            margin-top: 15px;
+        }
+        
+        .modal-buttons button {
+            flex: 1;
+        }
+
+        #search-product {
+            margin-bottom: 10px;
+        }
+        
+        @media (max-width: 480px) {
+            body {
+                padding: 5px;
+            }
+            
+            .container {
+                border-radius: 0;
+            }
+            
+            .rates-row {
+                flex-direction: column;
+                gap: 8px;
+            }
+
+            .product-bottom-row {
+                flex-direction: column; 
+                align-items: flex-start; 
+                gap: 5px;
+            }
+            .product-prices {
+                flex-direction: column;
+                gap: 5px;
+                width: 100%; 
+            }
+            .price-item {
+                justify-content: space-between; 
+                width: 100%;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <header>
+            <h1>Lista de Precios</h1>
+        </header>
+        
+        <div class="tabs">
+            <div class="tab active" onclick="switchTab('add-product')">Agregar</div>
+            <div class="tab" onclick="switchTab('product-list')">Productos</div>
+        </div>
+        
+        <div id="add-product" class="tab-content active">
+            <div class="form-group">
+                <label for="product-id">ID del Producto</label>
+                <input type="text" id="product-id" placeholder="Ej. 001"> 
+            </div>
+            
+            <div class="form-group">
+                <label for="product-name">Nombre del Producto</label>
+                <input type="text" id="product-name" placeholder="Ej. Camiseta básica">
+            </div>
+            
+            <div class="form-group">
+                <label for="purchase-price">Precio de Compra ($)</label>
+                <input type="number" id="purchase-price" step="0.01" min="0" placeholder="10.00">
+            </div>
+            
+            <div class="form-group">
+                <label for="profit-percentage">% Ganancia</label>
+                <input type="number" id="profit-percentage" step="1" min="0" value="20" placeholder="20">
+            </div>
+            
+            <div class="form-group">
+                <label for="sale-price-usd">Precio Venta ($)</label>
+                <input type="text" id="sale-price-usd" readonly>
+            </div>
+            
+            <div class="form-group">
+                <label for="sale-price-bs">Precio Venta (Bs.)</label>
+                <input type="text" id="sale-price-bs" readonly>
+            </div>
+            
+            <button id="save-product" class="btn-success">Guardar Producto</button>
+        </div>
+        
+        <div id="product-list" class="tab-content">
+            <div class="rates-config">
+                <h3>Configurar Tasas</h3>
+                <div class="rates-row">
+                    <div class="rate-input">
+                        <label for="current-purchase-rate">Tasa Compra (Bs./$)</label>
+                        <input type="number" id="current-purchase-rate" step="0.01" value="36.5" min="0">
+                    </div>
+                    <div class="rate-input">
+                        <label for="current-sale-rate">Tasa Día (Bs./$)</label>
+                        <input type="number" id="current-sale-rate" step="0.01" value="37.2" min="0">
+                    </div>
+                </div>
+                <button id="update-rates" class="btn-warning" onclick="showUpdateRatesModal()">Actualizar Tasas</button>
+            </div>
+            
+            <div class="form-group" style="margin-top: 15px;">
+                <label for="search-product">Buscar Producto</label>
+                <input type="text" id="search-product" placeholder="Buscar por nombre o ID...">
+            </div>
+
+            <div class="product-list" id="products-container">
+                <div class="empty-state">
+                    <p>No hay productos agregados todavía.</p>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div id="confirm-modal" class="modal">
+        <div class="modal-content">
+            <h3 id="modal-title">Confirmar Acción</h3>
+            <p id="modal-message">Ingrese la clave de seguridad (0000) para continuar:</p>
+            <input type="password" id="security-code" placeholder="Clave de seguridad">
+            <div class="modal-buttons">
+                <button id="confirm-action" class="btn-success" onclick="handleModalConfirmation()">Confirmar</button>
+                <button id="cancel-action" class="btn-warning" onclick="cancelModal()">Cancelar</button>
+            </div>
+            <p id="error-message" style="color: var(--delete-color); margin-top: 10px; display: none;">Clave incorrecta</p>
+        </div>
+    </div>
+
+    <script>
+        // Variables globales
+        let productToDelete = null;
+        let currentModalAction = null; // 'deleteProduct' o 'updateRates'
+        const SECURITY_CODE = "0000";
+        
+        // Cargar tasas guardadas
+        function loadRates() {
+            const rates = JSON.parse(localStorage.getItem('rates')) || { purchase: 36.5, sale: 37.2 };
+            document.getElementById('current-purchase-rate').value = rates.purchase.toFixed(2);
+            document.getElementById('current-sale-rate').value = rates.sale.toFixed(2);
+            return rates;
+        }
+        
+        // Función para ejecutar la actualización de tasas (antes era updateRates directamente)
+        function executeUpdateRates() {
+            const purchaseRate = parseFloat(document.getElementById('current-purchase-rate').value) || 36.5;
+            const saleRate = parseFloat(document.getElementById('current-sale-rate').value) || 37.2;
+            
+            const rates = {
+                purchase: purchaseRate,
+                sale: saleRate,
+                lastUpdate: new Date().toLocaleString()
+            };
+            
+            localStorage.setItem('rates', JSON.stringify(rates));
+            
+            recalculateAllProducts();
+            
+            alert('Tasas actualizadas correctamente');
+        }
+
+        // Recalcular todos los productos con las tasas actuales
+        function recalculateAllProducts() {
+            const products = JSON.parse(localStorage.getItem('products')) || [];
+            const rates = loadRates();
+            
+            if (products.length === 0) return;
+            
+            const updatedProducts = products.map(product => {
+                const purchasePrice = parseFloat(product.purchasePrice);
+                const profitPercentage = parseFloat(product.profitPercentage);
+                
+                // Recalcular con la fórmula
+                const priceWithProfit = purchasePrice * (1 + profitPercentage / 100);
+                const salePriceBS = (priceWithProfit * rates.purchase).toFixed(2);
+                const salePriceUSD = (priceWithProfit * rates.purchase / rates.sale).toFixed(2);
+                
+                return {
+                    ...product,
+                    salePriceUSD: salePriceUSD,
+                    salePriceBS: salePriceBS,
+                    purchaseRate: rates.purchase.toFixed(2),
+                    saleRate: rates.sale.toFixed(2)
+                };
+            });
+            
+            localStorage.setItem('products', JSON.stringify(updatedProducts));
+            renderProductList(); 
+        }
+        
+        // Cambiar entre pestañas
+        function switchTab(tabId) {
+            document.querySelectorAll('.tab-content').forEach(content => {
+                content.classList.remove('active');
+            });
+            
+            document.querySelectorAll('.tab').forEach(tab => {
+                tab.classList.remove('active');
+            });
+            
+            document.getElementById(tabId).classList.add('active');
+            document.querySelector(`.tab[onclick="switchTab('${tabId}')"]`).classList.add('active');
+        }
+        
+        // Calcular precios de venta según la fórmula corregida
+        function calculateSalePrices() {
+            const purchasePrice = parseFloat(document.getElementById('purchase-price').value) || 0;
+            const profitPercentage = parseFloat(document.getElementById('profit-percentage').value) || 0;
+            const rates = loadRates();
+            
+            const priceWithProfit = purchasePrice * (1 + profitPercentage / 100);
+            const salePriceBS = (priceWithProfit * rates.purchase).toFixed(2);
+            const salePriceUSD = (priceWithProfit * rates.purchase / rates.sale).toFixed(2);
+            
+            document.getElementById('sale-price-usd').value = salePriceUSD;
+            document.getElementById('sale-price-bs').value = salePriceBS;
+        }
+        
+        // Guardar producto
+        function saveProduct() {
+            const productId = document.getElementById('product-id').value.trim(); 
+            const productName = document.getElementById('product-name').value;
+            const purchasePrice = document.getElementById('purchase-price').value;
+            const profitPercentage = document.getElementById('profit-percentage').value;
+            const salePriceUSD = document.getElementById('sale-price-usd').value;
+            const salePriceBS = document.getElementById('sale-price-bs').value;
+            const rates = loadRates();
+            
+            if (!productId || !productName || !purchasePrice) { 
+                alert('Por favor completa el ID, nombre y precio de compra del producto');
+                return;
+            }
+
+            let products = JSON.parse(localStorage.getItem('products')) || [];
+
+            const idExists = products.some(p => p.id === productId);
+            if (idExists) {
+                alert('El ID de producto ya existe. Por favor, ingrese un ID único.');
+                return;
+            }
+            
+            const product = {
+                id: productId,
+                name: productName,
+                purchasePrice: parseFloat(purchasePrice).toFixed(2),
+                profitPercentage: parseFloat(profitPercentage).toFixed(0),
+                salePriceUSD: salePriceUSD,
+                salePriceBS: salePriceBS,
+                purchaseRate: rates.purchase.toFixed(2),
+                saleRate: rates.sale.toFixed(2),
+                date: new Date().toLocaleDateString()
+            };
+            
+            products.push(product);
+            localStorage.setItem('products', JSON.stringify(products));
+            
+            document.getElementById('product-id').value = ''; 
+            document.getElementById('product-name').value = '';
+            document.getElementById('purchase-price').value = '';
+            document.getElementById('profit-percentage').value = '20';
+            document.getElementById('sale-price-usd').value = '';
+            document.getElementById('sale-price-bs').value = '';
+            
+            renderProductList();
+            
+            alert('Producto guardado correctamente');
+        }
+        
+        // Editar producto
+        function editProduct(index) {
+            const products = JSON.parse(localStorage.getItem('products')) || [];
+            const product = products[index];
+            
+            const productElement = document.getElementById(`product-${index}`);
+            const existingEditForm = productElement.querySelector('.edit-form');
+            if (existingEditForm) {
+                existingEditForm.remove();
+            }
+
+            productElement.innerHTML += `
+                <div class="edit-form" id="edit-form-${index}">
+                    <div class="form-group">
+                        <label>Precio Compra ($)</label>
+                        <input type="number" id="edit-purchase-${index}" value="${product.purchasePrice}" step="0.01" min="0">
+                    </div>
+                    <div class="form-group">
+                        <label>% Ganancia</label>
+                        <input type="number" id="edit-profit-${index}" value="${product.profitPercentage}" step="1" min="0">
+                    </div>
+                    <div class="edit-buttons">
+                        <button class="btn-success" onclick="saveEdit(${index})">Guardar</button>
+                        <button class="btn-warning" onclick="cancelEdit(${index})">Cancelar</button>
+                    </div>
+                </div>
+            `;
+            
+            document.getElementById(`edit-form-${index}`).style.display = 'block';
+        }
+        
+        // Guardar edición
+        function saveEdit(index) {
+            const products = JSON.parse(localStorage.getItem('products')) || [];
+            const rates = loadRates();
+            
+            const newPurchasePrice = parseFloat(document.getElementById(`edit-purchase-${index}`).value) || 0;
+            const newProfitPercentage = parseFloat(document.getElementById(`edit-profit-${index}`).value) || 0;
+            
+            const priceWithProfit = newPurchasePrice * (1 + newProfitPercentage / 100);
+            const newSalePriceBS = (priceWithProfit * rates.purchase).toFixed(2);
+            const newSalePriceUSD = (priceWithProfit * rates.purchase / rates.sale).toFixed(2);
+            
+            products[index].purchasePrice = newPurchasePrice.toFixed(2);
+            products[index].profitPercentage = newProfitPercentage.toFixed(0);
+            products[index].salePriceUSD = newSalePriceUSD;
+            products[index].salePriceBS = newSalePriceBS;
+            products[index].purchaseRate = rates.purchase.toFixed(2);
+            products[index].saleRate = rates.sale.toFixed(2);
+            
+            localStorage.setItem('products', JSON.stringify(products));
+            renderProductList();
+        }
+        
+        // Cancelar edición
+        function cancelEdit(index) {
+            const editForm = document.getElementById(`edit-form-${index}`);
+            if (editForm) {
+                editForm.remove();
+            }
+            renderProductList(); 
+        }
+        
+        // Muestra el modal de confirmación para eliminar
+        function showDeleteModal(index) {
+            productToDelete = index;
+            currentModalAction = 'deleteProduct';
+            document.getElementById('modal-title').innerText = 'Confirmar Eliminación';
+            document.getElementById('modal-message').innerText = 'Ingrese la clave de seguridad (0000) para eliminar el producto:';
+            document.getElementById('security-code').value = '';
+            document.getElementById('error-message').style.display = 'none';
+            document.getElementById('confirm-modal').style.display = 'flex';
+        }
+
+        // Muestra el modal de confirmación para actualizar tasas
+        function showUpdateRatesModal() {
+            currentModalAction = 'updateRates';
+            document.getElementById('modal-title').innerText = 'Confirmar Actualización de Tasas';
+            document.getElementById('modal-message').innerText = 'Ingrese la clave de seguridad (0000) para actualizar las tasas:';
+            document.getElementById('security-code').value = '';
+            document.getElementById('error-message').style.display = 'none';
+            document.getElementById('confirm-modal').style.display = 'flex';
+        }
+        
+        // Maneja la confirmación de cualquier acción del modal
+        function handleModalConfirmation() {
+            const inputCode = document.getElementById('security-code').value;
+            
+            if (inputCode === SECURITY_CODE) {
+                if (currentModalAction === 'deleteProduct') {
+                    deleteProduct(productToDelete);
+                    alert('Producto eliminado correctamente');
+                } else if (currentModalAction === 'updateRates') {
+                    executeUpdateRates();
+                }
+                document.getElementById('confirm-modal').style.display = 'none';
+            } else {
+                document.getElementById('error-message').style.display = 'block';
+            }
+            productToDelete = null; // Reset
+            currentModalAction = null; // Reset
+        }
+        
+        // Cancela cualquier acción del modal
+        function cancelModal() {
+            productToDelete = null;
+            currentModalAction = null;
+            document.getElementById('confirm-modal').style.display = 'none';
+        }
+        
+        // Eliminar producto
+        function deleteProduct(index) {
+            const products = JSON.parse(localStorage.getItem('products')) || [];
+            products.splice(index, 1);
+            localStorage.setItem('products', JSON.stringify(products));
+            renderProductList();
+        }
+
+        // Filtrar productos y renderizar con el nuevo layout
+        function filterProducts() {
+            const searchTerm = document.getElementById('search-product').value.toLowerCase();
+            const products = JSON.parse(localStorage.getItem('products')) || [];
+            const productsContainer = document.getElementById('products-container');
+
+            productsContainer.innerHTML = ''; 
+
+            const filteredProducts = products.filter(product =>
+                product.name.toLowerCase().includes(searchTerm) ||
+                product.id.toLowerCase().includes(searchTerm) 
+            );
+
+            if (filteredProducts.length === 0) {
+                productsContainer.innerHTML = `
+                    <div class="empty-state">
+                        <p>No hay productos agregados todavía.</p>
+                    </div>
+                `;
+                return;
+            }
+
+            filteredProducts.forEach(product => {
+                const originalIndex = products.findIndex(p => p.id === product.id); 
+                if (originalIndex === -1) return;
+
+                const productElement = document.createElement('div');
+                productElement.className = 'product-item';
+                productElement.id = `product-${originalIndex}`; 
+
+                productElement.innerHTML = `
+                    <div class="product-top-row">
+                        <div class="product-id">#${product.id}</div>
+                        <div class="product-actions">
+                            <button class="btn-edit" onclick="editProduct(${originalIndex})">Editar</button>
+                            <button class="btn-delete" onclick="showDeleteModal(${originalIndex})">Eliminar</button>
+                        </div>
+                    </div>
+                    <div class="product-name">${product.name}</div>
+                    <div class="product-bottom-row">
+                        <div class="profit-percentage">${product.profitPercentage}% ganancia</div>
+                        <div class="product-prices">
+                            <div class="price-item">
+                                <span class="price-value price-usd">$${product.salePriceUSD}</span>
+                            </div>
+                            <div class="price-item">
+                                <span class="price-value price-bs">${product.salePriceBS} Bs.</span>
+                            </div>
+                        </div>
+                    </div>
+                `;
+                productsContainer.appendChild(productElement);
+            });
+        }
+        
+        // Renderizar lista de productos (llama a filterProducts)
+        function renderProductList() {
+            filterProducts(); 
+        }
+        
+        // Event listeners
+        document.addEventListener('DOMContentLoaded', function() {
+            loadRates();
+            
+            document.getElementById('purchase-price').addEventListener('input', calculateSalePrices);
+            document.getElementById('profit-percentage').addEventListener('input', calculateSalePrices);
+            
+            document.getElementById('save-product').addEventListener('click', saveProduct);
+            
+            document.getElementById('search-product').addEventListener('input', filterProducts);
+            
+            renderProductList();
+        });
+    </script>
+</body>
+</html>
